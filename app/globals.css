@@ -1,0 +1,95 @@
+:root {
+  color-scheme: light;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #17202a;
+  background: #f6f7f9;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  line-height: 1.5;
+}
+
+a {
+  color: #204ab5;
+  text-underline-offset: 3px;
+}
+
+button,
+a {
+  touch-action: manipulation;
+}
+
+:focus-visible {
+  outline: 2px solid #204ab5;
+  outline-offset: 4px;
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #dde1e6;
+  background: white;
+}
+
+.brand {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.container {
+  max-width: 960px;
+  margin: 40px auto;
+  padding: 0 20px;
+}
+
+.panel {
+  padding: 24px;
+  border: 1px solid #dde1e6;
+  border-radius: 8px;
+  background: white;
+}
+
+h1 {
+  margin-top: 0;
+  font-size: 28px;
+}
+
+.button {
+  display: inline-block;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 4px;
+  background: #204ab5;
+  color: white;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.auth-page {
+  display: flex;
+  justify-content: center;
+}
+
+.auth-state {
+  color: #56616e;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}

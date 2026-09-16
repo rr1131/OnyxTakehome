@@ -9,12 +9,8 @@ out/
 dist/
 build/
 
-# local env files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# environment files (including files downloaded by Vercel)
+.env*
 
 # keep the template
 !.env.example
