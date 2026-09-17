@@ -1,54 +1,24 @@
--- Block 2: apply this entire file once in the Neon SQL editor.
--- Prices/cash are USD with six decimal places; quantities support fractional contracts to twelve decimal places.
--- Markets stay upstream. market_id is only a reference, not a local catalog.
+-- Apply to an existing Block 2/4 database before submitting paper orders.
+-- This migration is transactional and may be rerun without losing trade data.
+-- Fractional quantities are necessary for quantity = notional / fill price.
 BEGIN;
-
-CREATE TABLE public.accounts (
-  user_id text PRIMARY KEY CHECK (length(btrim(user_id)) > 0),
-  balance numeric(20, 6) NOT NULL DEFAULT 1000.000000
-    CHECK (balance >= 0 AND balance <> 'NaN'::numeric),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE public.orders (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id text NOT NULL REFERENCES public.accounts(user_id),
-  market_id text NOT NULL CHECK (length(btrim(market_id)) > 0),
-  outcome text NOT NULL CHECK (outcome IN ('YES', 'NO')),
-  quantity numeric(28, 12) NOT NULL CHECK (quantity > 0 AND quantity <> 'NaN'::numeric),
-  status text NOT NULL DEFAULT 'filled' CHECK (status = 'filled'),
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX orders_user_history_idx
-  ON public.orders (user_id, created_at DESC, id DESC);
-
-CREATE TABLE public.fills (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  -- The prototype fills each order completely, exactly once.
-  order_id uuid NOT NULL UNIQUE REFERENCES public.orders(id),
-  quantity numeric(28, 12) NOT NULL CHECK (quantity > 0 AND quantity <> 'NaN'::numeric),
-  price numeric(7, 6) NOT NULL CHECK (price > 0 AND price <= 1),
-  total_cost numeric(20, 6) GENERATED ALWAYS AS (quantity * price) STORED,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE public.positions (
-  user_id text NOT NULL REFERENCES public.accounts(user_id),
-  market_id text NOT NULL CHECK (length(btrim(market_id)) > 0),
-  outcome text NOT NULL CHECK (outcome IN ('YES', 'NO')),
-  quantity numeric(28, 12) NOT NULL CHECK (quantity > 0 AND quantity <> 'NaN'::numeric),
-  total_cost numeric(20, 6) NOT NULL
-    CHECK (total_cost > 0 AND total_cost <= quantity),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, market_id, outcome)
-);
-
--- Buy-only execution. The server order handler must authenticate the
--- user and obtain/normalize the authoritative fill price before calling this.
--- Do not expose this function or database credentials directly to the browser.
+-- Rebuild only this generated column so quantity's type can be changed.
+-- Every stored cost is recomputed from its existing fill quantity and price.
+ALTER TABLE public.fills DROP COLUMN IF EXISTS total_cost;
+ALTER TABLE public.orders ALTER COLUMN quantity TYPE numeric(28, 12);
+ALTER TABLE public.fills ALTER COLUMN quantity TYPE numeric(28, 12);
+ALTER TABLE public.positions ALTER COLUMN quantity TYPE numeric(28, 12);
+ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_quantity_finite;
+ALTER TABLE public.fills DROP CONSTRAINT IF EXISTS fills_quantity_finite;
+ALTER TABLE public.positions DROP CONSTRAINT IF EXISTS positions_quantity_finite;
+ALTER TABLE public.orders ADD CONSTRAINT orders_quantity_finite CHECK (quantity <> 'NaN'::numeric);
+ALTER TABLE public.fills ADD CONSTRAINT fills_quantity_finite CHECK (quantity <> 'NaN'::numeric);
+ALTER TABLE public.positions ADD CONSTRAINT positions_quantity_finite CHECK (quantity <> 'NaN'::numeric);
+ALTER TABLE public.fills ADD COLUMN total_cost numeric(20, 6)
+  GENERATED ALWAYS AS (quantity * price) STORED;
+-- Recreate both known versions because PostgreSQL cannot replace return types.
+DROP FUNCTION IF EXISTS public.execute_paper_order(text, text, text, integer, numeric);
+DROP FUNCTION IF EXISTS public.execute_paper_order(text, text, text, numeric, numeric);
 CREATE FUNCTION public.execute_paper_order(
   p_user_id text,
   p_market_id text,

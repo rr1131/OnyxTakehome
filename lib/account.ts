@@ -2,7 +2,7 @@ import "server-only";
 import { getDb } from "./db";
 
 // Monetary values are exact decimal strings, never floating-point numbers.
-// Integer contract quantities remain JSON numbers; timestamps are ISO strings.
+// Fractional contract quantities are decimal strings; timestamps are ISO strings.
 export type AccountState = {
   userId: string;
   currency: "USD";
@@ -12,7 +12,7 @@ export type AccountState = {
   positions: {
     marketId: string;
     outcome: "YES" | "NO";
-    quantity: number;
+    quantity: string;
     totalCost: string;
     averagePrice: string;
     createdAt: string;
@@ -22,14 +22,14 @@ export type AccountState = {
     id: string;
     marketId: string;
     outcome: "YES" | "NO";
-    quantity: number;
+    quantity: string;
     status: "filled";
     createdAt: string;
   }[];
   fills: {
     id: string;
     orderId: string;
-    quantity: number;
+    quantity: string;
     price: string;
     totalCost: string;
     createdAt: string;
@@ -60,7 +60,7 @@ export async function getAccountState(userId: string): Promise<AccountState> {
             SELECT jsonb_agg(jsonb_build_object(
               'marketId', p.market_id,
               'outcome', p.outcome,
-              'quantity', p.quantity,
+              'quantity', p.quantity::text,
               'totalCost', p.total_cost::text,
               'averagePrice', (p.total_cost / p.quantity)::numeric(7, 6)::text,
               'createdAt', p.created_at,
@@ -74,7 +74,7 @@ export async function getAccountState(userId: string): Promise<AccountState> {
               'id', o.id,
               'marketId', o.market_id,
               'outcome', o.outcome,
-              'quantity', o.quantity,
+              'quantity', o.quantity::text,
               'status', o.status,
               'createdAt', o.created_at
             ) ORDER BY o.created_at DESC, o.id DESC)
@@ -85,7 +85,7 @@ export async function getAccountState(userId: string): Promise<AccountState> {
             SELECT jsonb_agg(jsonb_build_object(
               'id', f.id,
               'orderId', f.order_id,
-              'quantity', f.quantity,
+              'quantity', f.quantity::text,
               'price', f.price::text,
               'totalCost', f.total_cost::text,
               'createdAt', f.created_at

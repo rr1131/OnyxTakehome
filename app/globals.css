@@ -93,3 +93,86 @@ h1 {
   font-size: 14px;
   overflow-wrap: anywhere;
 }
+
+.market-browser {
+  margin-top: 32px;
+}
+
+.market-toolbar,
+.market-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.market-toolbar h2,
+.market-card h3 {
+  margin: 0;
+}
+
+.market-toolbar p {
+  margin: 4px 0 16px;
+}
+
+.market-toolbar select {
+  padding: 8px;
+  border: 1px solid #b8c0ca;
+  border-radius: 4px;
+  background: white;
+  font: inherit;
+}
+
+.market-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.market-card {
+  padding: 16px;
+  border: 1px solid #dde1e6;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+
+.market-card h3 {
+  font-size: 17px;
+}
+
+.market-prices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+}
+
+.market-prices dt {
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.market-prices dd {
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.market-pagination {
+  margin-top: 24px;
+}
+
+.button:disabled {
+  background: #e0e4eb;
+  color: #56616e;
+  cursor: not-allowed;
+}
+
+.market-error {
+  padding: 12px;
+  border: 1px solid #dfb576;
+  border-radius: 4px;
+  background: #fff7e8;
+  color: #704200;
+}
