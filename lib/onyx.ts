@@ -207,3 +207,31 @@ export async function fetchMarketById(id: string, signal?: AbortSignal): Promise
     offset += page.limit;
   }
 }
+
+// One fresh catalog scan serves every holding, including both sides of the
+// same UUID. No status filter: closed markets can still have a current quote.
+export async function fetchMarketsByIds(
+  ids: Iterable<string>,
+  signal?: AbortSignal,
+): Promise<Map<string, Market>> {
+  const pending = new Set(ids);
+  const markets = new Map<string, Market>();
+  const seen = new Set<string>();
+  let offset = 0;
+
+  while (pending.size > 0) {
+    signal?.throwIfAborted();
+    const page = await fetchMarkets({ limit: MAX_MARKET_PAGE_SIZE, offset, signal });
+    const previousSize = seen.size;
+    for (const market of page.markets) {
+      seen.add(market.id);
+      if (pending.delete(market.id)) markets.set(market.id, market);
+    }
+    if (!page.hasMore || pending.size === 0) break;
+    if (seen.size === previousSize) fail("INVALID_RESPONSE");
+    offset += page.limit;
+  }
+
+  signal?.throwIfAborted();
+  return markets;
+}

@@ -1,12 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { NeonDbError } from "@neondatabase/serverless";
-import { getAccountState } from "@/lib/account";
+import { getPortfolioState } from "@/lib/portfolio-state";
 
 export const dynamic = "force-dynamic";
 
 const headers = { "Cache-Control": "private, no-store" };
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { userId } = await auth();
 
@@ -17,9 +17,15 @@ export async function GET() {
       );
     }
 
-    const account = await getAccountState(userId);
+    const account = await getPortfolioState(userId, request.signal);
     return Response.json(account, { headers });
   } catch (error) {
+    if (request.signal.aborted) {
+      return Response.json(
+        { error: "Request cancelled." },
+        { status: 499, headers },
+      );
+    }
     // SQLSTATE is safe diagnostic context. Raw errors can include credentials,
     // query parameters, connection strings, or user information.
     const code =

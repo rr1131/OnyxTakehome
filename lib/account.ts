@@ -1,43 +1,15 @@
 import "server-only";
 import { getDb } from "./db";
+import type { AccountState } from "./portfolio";
 
-// Monetary values are exact decimal strings, never floating-point numbers.
-// Fractional contract quantities are decimal strings; timestamps are ISO strings.
-export type AccountState = {
-  userId: string;
-  currency: "USD";
-  balance: string;
-  createdAt: string;
-  updatedAt: string;
-  positions: {
-    marketId: string;
-    outcome: "YES" | "NO";
-    quantity: string;
-    totalCost: string;
-    averagePrice: string;
-    createdAt: string;
-    updatedAt: string;
-  }[];
-  orders: {
-    id: string;
-    marketId: string;
-    outcome: "YES" | "NO";
-    quantity: string;
-    status: "filled";
-    createdAt: string;
-  }[];
-  fills: {
-    id: string;
-    orderId: string;
-    quantity: string;
-    price: string;
-    totalCost: string;
-    createdAt: string;
-  }[];
-};
+export type { AccountState } from "./portfolio";
 
 // userId must come from the authenticated Clerk session, never request input.
-export async function getAccountState(userId: string): Promise<AccountState> {
+export async function getAccountState(
+  userId: string,
+  signal?: AbortSignal,
+): Promise<AccountState> {
+  signal?.throwIfAborted();
   const sql = getDb();
   const [, rows] = await sql.transaction(
     [
@@ -99,7 +71,7 @@ export async function getAccountState(userId: string): Promise<AccountState> {
         WHERE a.user_id = ${userId}
       `,
     ],
-    { isolationLevel: "ReadCommitted" },
+    { isolationLevel: "ReadCommitted", fetchOptions: { signal } },
   );
 
   if (!rows[0]?.account) {

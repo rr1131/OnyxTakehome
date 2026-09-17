@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import BuyControls from "./buy-controls";
+import Portfolio from "./portfolio";
+import { usePortfolioAccount } from "./use-portfolio-account";
 import { DEFAULT_MARKET_PAGE_SIZE, type MarketPage } from "@/lib/market";
 
 const POLL_DELAY_MS = 5_000;
@@ -18,69 +20,45 @@ type Pagination = { limit: number; offset: number };
 export default function MarketBrowser() {
   const submissionRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
-  const accountRequest = useRef<AbortController | null>(null);
-  const [balance, setBalance] = useState<string | null>(null);
-  const [accountError, setAccountError] = useState<string | null>(null);
-  const refreshAccount = useCallback(async () => {
-    accountRequest.current?.abort();
-    const controller = new AbortController();
-    accountRequest.current = controller;
-    try {
-      const response = await fetch("/api/account", { cache: "no-store", signal: controller.signal });
-      if (!response.ok) throw new Error("Account unavailable.");
-      const account = await response.json();
-      if (accountRequest.current !== controller || controller.signal.aborted) return;
-      setBalance(account.balance);
-      setAccountError(null);
-    } catch {
-      if (accountRequest.current !== controller || controller.signal.aborted) return;
-      setAccountError("Unable to refresh account balance.");
-    }
-  }, []);
-  useEffect(() => {
-    const timer = setTimeout(() => { void refreshAccount(); }, 0);
-    return () => {
-      clearTimeout(timer);
-      accountRequest.current?.abort();
-    };
-  }, [refreshAccount]);
+  const { account, error: accountError, signedOut, refreshAccount } = usePortfolioAccount();
   const [pagination, setPagination] = useState<Pagination>({
     limit: DEFAULT_MARKET_PAGE_SIZE,
     offset: 0,
   });
 
   return (
-    <section className="market-browser" aria-labelledby="markets-heading">
-      {balance !== null && <p>Cash balance: ${balance}</p>}
-      {accountError && <p role="alert">{accountError}</p>}
-      <div className="market-toolbar">
-        <div>
-          <h2 id="markets-heading">Markets</h2>
-          <p>Prices refresh about every five seconds.</p>
+    <>
+      <Portfolio account={account} error={accountError} signedOut={signedOut} />
+      <section className="market-browser" aria-labelledby="markets-heading">
+        <div className="market-toolbar">
+          <div>
+            <h2 id="markets-heading">Markets</h2>
+            <p>Prices refresh about every five seconds.</p>
+          </div>
+          <label>
+            Markets per page{" "}
+            <select
+              value={pagination.limit}
+              disabled={submitting || signedOut}
+              onChange={(event) => setPagination({ limit: Number(event.target.value), offset: 0 })}
+            >
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </label>
         </div>
-        <label>
-          Markets per page{" "}
-          <select
-            value={pagination.limit}
-            disabled={submitting}
-            onChange={(event) => setPagination({ limit: Number(event.target.value), offset: 0 })}
-          >
-            <option value={20}>20</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </select>
-        </label>
-      </div>
-      <MarketList
-        key={`${pagination.limit}:${pagination.offset}`}
-        pagination={pagination}
-        onNavigate={setPagination}
-        onAccountRefresh={refreshAccount}
-        submitting={submitting}
-        submissionRef={submissionRef}
-        onPendingChange={setSubmitting}
-      />
-    </section>
+        <MarketList
+          key={`${pagination.limit}:${pagination.offset}`}
+          pagination={pagination}
+          onNavigate={setPagination}
+          onAccountRefresh={refreshAccount}
+          submitting={submitting || signedOut}
+          submissionRef={submissionRef}
+          onPendingChange={setSubmitting}
+        />
+      </section>
+    </>
   );
 }
 

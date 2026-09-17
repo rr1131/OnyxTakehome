@@ -7,9 +7,9 @@ export default async function DashboardPage() {
   return (
     <section className="panel">
       <h1>Dashboard</h1>
-      <p>Browse live prediction markets.</p>
+      <p>Browse live markets and track your paper portfolio.</p>
       <p className="auth-state">User ID: {userId}</p>
-      <MarketBrowser />
+      <MarketBrowser key={userId} />
     </section>
   );
 }
