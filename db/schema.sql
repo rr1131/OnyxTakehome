@@ -1,4 +1,5 @@
--- Block 2: apply this entire file once in the Neon SQL editor.
+-- Final application schema: apply this entire file once to a fresh database.
+-- Not a migration or a reset script; do not rerun over existing tables.
 -- Prices/cash are USD with six decimal places; quantities support fractional contracts to twelve decimal places.
 -- Markets stay upstream. market_id is only a reference, not a local catalog.
 BEGIN;

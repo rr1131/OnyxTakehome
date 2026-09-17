@@ -2,9 +2,18 @@
 
 **Live demo:** [onyx-takehome.vercel.app](https://onyx-takehome.vercel.app)
 
+Welcome to Rods TakeHome Paper Trading project!
+
 A small paper-trading app with Clerk sign-in, live Onyx markets, $1,000 in
 starting virtual cash, buy-only YES/NO orders, and a persistent portfolio with
 unrealized P&L. No real money or upstream trades are involved.
+
+## TESTING FOR YOU GUYS
+
+Made you all an account for testing: 
+
+email = testonyx@gmail.com
+password = g30dud31234567!
 
 ## Local setup
 
@@ -81,7 +90,7 @@ for display. Average entry is cost basis / quantity; current value is quantity
   with `limit`/`offset`; helpers support pages, the full catalog, and UUID lookup.
 - **Identity:** upstream market UUID `id` is canonical because observed `symbol`
   values may repeat. Symbols are metadata, never lookup or position keys.
-- **Prices:** YES comes from upstream `yes_price`; NO is derived as `1 - YES`
+- **Prices:** YES comes from upstream `yes_price`; I defined NO as `1 - YES`
   because the observed schema has no explicit NO price. Null-priced markets
   remain browseable but cannot be traded.
 - **Authoritative execution:** the server takes the user from Clerk and performs
@@ -108,7 +117,7 @@ for display. Average entry is cost basis / quantity; current value is quantity
   `ONYX_API_TOKEN`. Its observed lifetime is approximately 24 hours. There is no
   automatic refresh: replace an expired token in the environment and redeploy.
   Upstream auth errors are sanitized; server logs retain safe error codes without
-  credentials, provider payloads, or raw exceptions.
+  credentials, provider payloads, or raw exceptions. I'll make a new one before. 
 
 ## Known limitations
 
@@ -126,6 +135,8 @@ temporary integration checks cover the current implementation.
 
 ## What I'd build next
 
+- Selling functionality for existing filled orders at current market price
+- Would polish the UI to enable filtering via get/market endpoint filters (sport, event type)
 - Streaming/WebSockets for price updates and fewer catalog scans.
 - Idempotency keys and safe order retries.
 - Settlement and realized P&L, with an auditable ledger.
