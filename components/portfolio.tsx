@@ -50,7 +50,7 @@ export default function Portfolio({ account, error, signedOut }: {
     return (
       <section className="portfolio" aria-labelledby="portfolio-heading">
         <h2 id="portfolio-heading">Portfolio</h2>
-        <p role="alert">Your session has ended. <Link href="/sign-in">Sign in</Link> to view your account.</p>
+        <p className="market-error" role="alert">Your session has ended. <Link href="/sign-in">Sign in</Link> to view your account.</p>
       </section>
     );
   }
@@ -70,7 +70,7 @@ export default function Portfolio({ account, error, signedOut }: {
           {error}{account && " Cash and trading history are last known values. Live values are unavailable until the next successful refresh."}
         </p>
       )}
-      {!account && !error && <p role="status">Loading account…</p>}
+      {!account && !error && <p className="state-message" role="status">Loading your portfolio and latest prices…</p>}
       {account && (
         <>
           <dl className="portfolio-summary">
@@ -93,9 +93,6 @@ export default function Portfolio({ account, error, signedOut }: {
               {" "}Equity includes cash and available position values only. Total unrealized P&amp;L is unavailable until all positions have prices.
             </p>
           )}
-          {!liveUnavailable && account.pricingUnavailable && account.unpricedPositionCount === 0 && (
-            <p className="auth-state" role="status">Live market pricing is unavailable.</p>
-          )}
           {!liveUnavailable && account.pricingUpdatedAt && (
             <p className="auth-state">
               Prices refreshed <time dateTime={account.pricingUpdatedAt}>{timestamp(account.pricingUpdatedAt)}</time>.
@@ -104,7 +101,7 @@ export default function Portfolio({ account, error, signedOut }: {
           )}
 
           <h3 id="positions-heading">Positions ({account.positions.length})</h3>
-          {account.positions.length === 0 ? <p>No positions yet.</p> : (
+          {account.positions.length === 0 ? <p className="state-message">No positions yet. Buy YES or NO on a tradable market below to start.</p> : (
             <div className="portfolio-table-scroll" role="region" aria-labelledby="positions-heading" tabIndex={0}>
               <table className="portfolio-table">
                 <thead>
@@ -140,7 +137,7 @@ export default function Portfolio({ account, error, signedOut }: {
           )}
 
           <h3 id="fills-heading">Recent fills / order history</h3>
-          {recentFills.length === 0 ? <p>No filled orders yet.</p> : (
+          {recentFills.length === 0 ? <p className="state-message">No filled orders yet. Your completed paper orders will appear here.</p> : (
             <>
               <p className="auth-state">Showing {recentFills.length} of {account.fills.length} fills · {account.orders.length} orders</p>
               <div className="portfolio-table-scroll" role="region" aria-labelledby="fills-heading" tabIndex={0}>

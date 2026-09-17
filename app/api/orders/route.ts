@@ -6,12 +6,14 @@ import { fetchMarketById, OnyxError } from "@/lib/onyx";
 export const dynamic = "force-dynamic";
 const headers = { "Cache-Control": "private, no-store" };
 const marketIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PRICING_TIMEOUT_MS = 20_000;
 
 function errorResponse(error: string, status: number) {
   return Response.json({ error }, { status, headers });
 }
 
 export async function POST(request: Request) {
+  let pricingDeadline: AbortSignal | undefined;
   try {
     const { userId } = await auth();
     if (!userId) return errorResponse("Authentication required.", 401);
@@ -37,7 +39,12 @@ export async function POST(request: Request) {
       !/^\d+(?:\.\d{1,2})?$/.test(String(notional))
     ) return errorResponse("Supply only a marketId UUID, side (YES or NO), and a positive USD notional with at most two decimal places.", 400);
 
-    const market = await fetchMarketById(marketId.toLowerCase(), request.signal);
+    // Bound the entire paginated quote lookup before any database writes.
+    pricingDeadline = AbortSignal.timeout(PRICING_TIMEOUT_MS);
+    const pricingSignal = AbortSignal.any([request.signal, pricingDeadline]);
+    const market = await fetchMarketById(marketId.toLowerCase(), pricingSignal);
+    pricingSignal.throwIfAborted();
+    pricingDeadline = undefined;
     if (!market) return errorResponse("Market not found.", 404);
     if (
       market.status !== "open" || !market.isTradable ||
@@ -73,6 +80,10 @@ export async function POST(request: Request) {
     return Response.json({ order: rows[0] }, { status: 201, headers });
   } catch (error) {
     if (request.signal.aborted) return new Response(null, { status: 499, headers });
+    if (pricingDeadline?.aborted) {
+      console.error("[api/orders] Fresh market lookup timed out.", { code: "UPSTREAM_TIMEOUT" });
+      return errorResponse("Unable to obtain a fresh market price. Please try again.", 504);
+    }
     if (error instanceof OnyxError) {
       return errorResponse(error.code === "UPSTREAM_AUTH"
         ? "Market data authentication failed. Please contact the application owner."

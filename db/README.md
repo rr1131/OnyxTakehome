@@ -1,110 +1,53 @@
-# Block 2 database setup
+# Database setup
 
-Apply the entire contents of `db/schema.sql` once in the **Neon SQL editor** for
-the database named by `DATABASE_URL`. Alternatively, with the connection string
-already exported in your shell:
+For a **fresh database**, apply the entire [`schema.sql`](schema.sql) in Neon's
+SQL editor. It creates the four tables, constraints, history index, and current
+`execute_paper_order` function in one transaction. The initial schema is not
+rerunnable over existing tables.
+
+For an **existing database from earlier blocks**, apply [`block4.sql`](block4.sql)
+instead. It upgrades integer quantities to `numeric(28,12)` and replaces the
+execution function with its current return fields. This migration is transactional
+and rerunnable; existing trades are preserved. Fresh installations already have
+these changes and do not need both scripts.
+
+Alternatively, with `DATABASE_URL` already exported in your shell, run the
+appropriate command:
 
 ```sh
+# Fresh database only:
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/schema.sql
+
+# Existing earlier-block database only:
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/block4.sql
 ```
 
-The script runs in a transaction and creates four tables, the order-history
-index, and `public.execute_paper_order`. It is an initial schema, not a repeatable
-migration: existing objects cause an error rather than silently changing data.
-No schema has been applied automatically. Use the schema-owning database role
-for the application; function execution is revoked from `PUBLIC`.
+Use the schema-owning role for the demo application. The function uses invoker
+permissions and execution is revoked from `PUBLIC`. Schema application is manual;
+application startup never runs migrations.
 
-The supplied `AGENTS.md` names the four tables but does not contain their fields
-or the referenced function signature. This block uses these explicit defaults:
+## Trade and account invariants
 
-- One account per Clerk user ID, initially credited with exactly $1,000 once.
-- Buy-only, fully filled YES/NO orders, with positive whole contract quantities.
-- Fill prices are **USD per contract**, greater than zero and at most one, with
-  at most six decimal places. Raw upstream price units must be normalized by the
-  future server order handler. No market data is stored or fetched here.
-- Positions are unique per user, market, and outcome. Quantity and exact total
-  cost are accumulated; average acquisition price is derived from those values.
-- UUID order/fill IDs, foreign keys, checks, and timezone-aware timestamps.
-- `orders_user_history_idx` covers user history in descending creation order.
+- `accounts` is keyed by Clerk user ID. First use inserts $1,000 with
+  `ON CONFLICT DO NOTHING`; subsequent reads/sign-ins do not reset cash.
+- `orders` and `fills` have UUID keys and a one-to-one relationship.
+- `positions` is keyed by `(user_id, market_id, outcome)`; YES and NO accumulate
+  separately, with quantity and cost basis preserved across requests.
+- Amounts/prices use six decimal places and quantities use twelve. Numeric
+  response fields are decimal strings; history is newest first.
 
-## Atomic paper order function
+`execute_paper_order(text, text, text, numeric, numeric)` takes the authenticated
+user ID, upstream market UUID, side, quantity, and server-authoritative fill price.
+The application validates fresh market status/pricing before calling it.
+The function conditionally debits with `UPDATE ... WHERE balance >= cost`, then
+inserts order/fill records and upserts the position atomically. Concurrent orders
+lock and recheck the account row; any exception rolls back all writes. SQLSTATE
+`P0001` means insufficient cash and `22023` means invalid input.
 
-```sql
-SELECT * FROM public.execute_paper_order(
-  p_user_id    => 'clerk-user-id',
-  p_market_id  => 'upstream-market-id',
-  p_outcome   => 'YES',
-  p_quantity  => 10,
-  p_fill_price => 0.450000
-);
-```
+Returned fields are `order_id`, `fill_id`, `balance`, `fill_price`,
+`filled_quantity`, `total_cost`, and `filled_at`, taken from the persisted
+execution. Calling this function **writes a trade**; it is not a read-only check.
 
-This example **writes a trade**; it is not part of the schema setup. The result
-contains `order_id`, `fill_id`, and the remaining `balance`.
-
-The function inserts an account on first use, then debits with
-`UPDATE ... WHERE balance >= cost RETURNING balance`. PostgreSQL locks that
-account row and rechecks the condition after any concurrent updater commits.
-It inserts the order and fill and upserts the position in the same transaction.
-Every exception propagates and rolls back the whole call, including initial
-account creation. Invalid input uses SQLSTATE `22023`; insufficient cash uses
-`P0001`. Higher transaction isolation can yield a serialization failure instead
-of an insufficient-cash error; the transaction still rolls back safely.
-
-The future server handler must obtain the Clerk user ID and authoritative price
-itself. This function does not verify market status or prevent duplicate
-submissions; each successful call is a distinct order.
-
-## Authenticated account endpoint
-
-`GET /api/account` accepts the current Clerk session. It does not accept a user
-ID from query parameters or the request body. Signed-out requests receive `401`
-before any database call; failures receive a generic `500`. Application logs
-contain a fixed message and, when available, SQLSTATE, never raw exceptions.
-Responses use `Cache-Control: private, no-store`.
-
-The endpoint initializes an absent account using `ON CONFLICT DO NOTHING`, so
-repeated or simultaneous reads cannot replenish an existing balance. It reads
-all state in one SQL snapshot and scopes every collection to the session user.
-
-Example for a new user (timestamps abbreviated):
-
-```json
-{
-  "userId": "clerk-user-id",
-  "currency": "USD",
-  "balance": "1000.000000",
-  "createdAt": "2026-09-16T00:00:00+00:00",
-  "updatedAt": "2026-09-16T00:00:00+00:00",
-  "positions": [],
-  "orders": [],
-  "fills": []
-}
-```
-
-All PostgreSQL NUMERIC values are explicitly converted to decimal strings before
-JSON construction. Quantities are JSON integers; IDs and timestamps are strings.
-History is newest first; positions are sorted by market and outcome. History is
-unpaginated for this prototype. There are no live prices, P&L, market requests,
-or `POST /api/orders` in this block.
-
-After applying the schema, sign in and open `/api/account`. Repeated requests
-should preserve the same $1,000 balance and account creation time. Use a second
-account to verify isolation and a private/signed-out browser to verify `401`.
-
-```sh
-npm run lint
-npm run build
-```
-
-## Validation performed
-
-Lint and the production build passed. The schema and account query were also
-run against a disposable local PostgreSQL 18 instance. Checks covered invalid
-inputs, insufficient cash, rollback after a forced late position failure,
-overlapping orders on the same account, simultaneous first-use funding,
-concurrent position accumulation, user isolation, history ordering, and exact
-decimal serialization. The route was exercised with a mocked Clerk session
-and local database transport to verify `401`, identity scoping, no-cache
-headers, and sanitized `500` responses. Live Clerk/Neon integration still needs
-the manual check above after the schema is applied.
+The account API reads a consistent, user-scoped database snapshot and adds live
+marks/P&L from Onyx without storing quotes or changing positions. See the
+[project README](../README.md) for setup, formulas, API behavior, and limitations.

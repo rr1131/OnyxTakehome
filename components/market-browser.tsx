@@ -12,7 +12,7 @@ const priceFormat = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
   minimumFractionDigits: 2,
-  maximumFractionDigits: 4,
+  maximumFractionDigits: 6,
 });
 
 type Pagination = { limit: number; offset: number };
@@ -134,9 +134,15 @@ function MarketList({ pagination, onNavigate, onAccountRefresh, submitting, subm
           {signedOut && <Link href="/sign-in">Sign in</Link>}
         </p>
       )}
-      {!page && !error && <p role="status">Loading markets…</p>}
-      {updatedAt && <p className="auth-state">Last updated: {updatedAt}</p>}
-      {page?.markets.length === 0 && <p>No markets on this page.</p>}
+      {!page && !error && <p className="state-message" role="status">Loading live markets…</p>}
+      {updatedAt && <p className="auth-state">Last successful update: {updatedAt}</p>}
+      {page?.markets.length === 0 && (
+        <p className="state-message" role="status">
+          {offset > 0
+            ? "No markets on this page. Use Previous to return to the catalog."
+            : "No markets are available right now. Checking again automatically."}
+        </p>
+      )}
       <ul className="market-list">
         {page?.markets.map((market) => (
           <li className="market-card" key={market.id}>
@@ -165,8 +171,8 @@ function MarketList({ pagination, onNavigate, onAccountRefresh, submitting, subm
       </ul>
       <nav className="market-pagination" aria-label="Market pages">
         <button
-          className="button"
-          disabled={offset === 0 || submitting}
+          className="button button-secondary"
+          disabled={offset === 0 || signedOut || submitting}
           onClick={() => onNavigate({ limit, offset: Math.max(0, offset - limit) })}
         >
           Previous
