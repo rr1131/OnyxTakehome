@@ -1,7 +1,7 @@
 import "server-only";
-import { neon } from "@neondatabase/serverless";
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 
-let sql: ReturnType<typeof neon> | undefined;
+let sql: NeonQueryFunction<false, false> | undefined;
 
 // Reading configuration and constructing the client happen only on first use.
 // Neon sends an HTTP request only when the returned client executes a query.
